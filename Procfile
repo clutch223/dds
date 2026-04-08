@@ -1,1 +1,1 @@
-worker: chmod +x bgmi && python3 watcher.py
+worker: chmod +x bgmi && python3 m.py
