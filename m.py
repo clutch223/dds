@@ -7,7 +7,7 @@ import signal
 
 # --- CONFIGURATION ---
 # Tera Bot Token
-TOKEN = '8749691844:AAF-YCPj_CsbiFM83vkGQ6kfCW20d6fADFE'
+TOKEN = '8749691844:AAHGRQZ-Y6IoWeX-Ir82deDexj2u5TcNkao'
 bot = telebot.TeleBot(TOKEN)
 
 # Admin ID aur File settings
