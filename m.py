@@ -7,7 +7,7 @@ import signal
 
 # --- CONFIGURATION ---
 # Tera Bot Token
-TOKEN = '8749691844:AAHGRQZ-Y6IoWeX-Ir82deDexj2u5TcNkao'
+TOKEN = '8749691844:AAF-YCPj_CsbiFM83vkGQ6kfCW20d6fADFE'
 bot = telebot.TeleBot(TOKEN)
 
 # Admin ID aur File settings
@@ -29,9 +29,10 @@ def read_users():
 
 # --- TERMINATOR LOGIC (Railway Optimized) ---
 def kill_other_instances():
-    """Kills any ghost processes safely without relying on 'ps' command."""
+    """Kills any ghost sessions safely by resetting the Telegram Webhook/Polling status."""
     print("🧹 Cleaning environment...")
-    # Railway handles container restarts, so we mainly focus on Telegram session
+    # Since 'ps' is not available in this environment, we rely on the Telegram API
+    # to drop pending updates and break any existing polling connections.
     try:
         # Resetting the webhook/polling session is the most effective way to stop duplicates
         requests.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=10)
