@@ -95,29 +95,25 @@ def help_cmd(message):
 if __name__ == "__main__":
     print("Railway Force Instance Cleaner Active...")
     
-    # Force delete webhook before starting
+    # Railway environment check: Initial cleanup
     try:
         bot.remove_webhook()
-        print("Webhook removed.")
-    except:
-        pass
-
-    # Wait for other potential Railway instances to be killed by the system
-    print("Waiting 10 seconds for clean environment...")
-    time.sleep(10)
+        time.sleep(5) # Give Telegram time to process the removal
+        print("Initial cleanup: Webhook/Connection cleared.")
+    except Exception as e:
+        print(f"Cleanup warning: {e}")
 
     while True:
         try:
             print("Attempting to start polling...")
-            # Use skip_pending to ignore old commands during the conflict period
-            bot.polling(none_stop=True, skip_pending=True, interval=1, timeout=40)
+            # interval=1 and timeout=20 is best for Railway stability
+            bot.polling(none_stop=True, skip_pending=True, interval=1, timeout=20)
         except Exception as e:
             error_msg = str(e)
             print(f"Polling Error: {error_msg}")
             
             if "Conflict" in error_msg or "409" in error_msg:
-                print("CRITICAL: Multiple instances detected. Waiting 30s for session to expire...")
-                # Long sleep to force Telegram to drop the other connection
-                time.sleep(30)
+                print("CONFLICT DETECTED: Sleeping 20s to force connection drop...")
+                time.sleep(20)
             else:
                 time.sleep(5)
