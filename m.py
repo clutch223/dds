@@ -92,21 +92,25 @@ def help_cmd(message):
 
 # --- Polling Logic with Conflict Fix ---
 if __name__ == "__main__":
-    print("Fixing conflicts and starting bot...")
+    print("Railway Conflict Fixer Active...")
     
-    # 1. Remove any existing webhooks that might cause 409 Conflict
+    # 1. Sabse pehle purana connection reset karo
     try:
         bot.remove_webhook()
-        time.sleep(1)
+        time.sleep(2)
     except:
         pass
 
     while True:
         try:
-            # 2. Start polling
-            # skip_pending=True purane messages ko process nahi karega jo crash ke time aaye the
+            print("Starting Bot Polling...")
+            # timeout=60 aur interval=2 dene se Railway par connection stable rehta hai
             bot.polling(none_stop=True, skip_pending=True, interval=2, timeout=60)
         except Exception as e:
-            # Agar conflict hota hai toh thoda wait karke dobara try karega
+            # Agar 409 error aaye, toh bot 15 seconds wait karega taaki purana deployment kill ho jaye
             print(f"Polling Error: {e}")
-            time.sleep(10)
+            if "Conflict" in str(e) or "409" in str(e):
+                print("Multiple instances detected. Sleeping for 15s to clear session...")
+                time.sleep(15)
+            else:
+                time.sleep(5)
