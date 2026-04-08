@@ -7,7 +7,7 @@ import signal
 
 # --- CONFIGURATION ---
 # Tera Bot Token
-TOKEN = '8749691844:AAHGRQZ-Y6IoWeX-Ir82deDexj2u5TcNkao'
+TOKEN = '8749691844:AAF-YCPj_CsbiFM83vkGQ6kfCW20d6fADFE'
 bot = telebot.TeleBot(TOKEN)
 
 # Admin ID aur File settings
@@ -27,14 +27,14 @@ def read_users():
 
 # --- TERMINATOR LOGIC (Railway Conflict Fixer) ---
 def kill_other_instances():
-    """Conflict se bachne ke liye purane processes ko kill karta hai."""
+    """Kills any ghost processes to prevent 409 Conflict."""
     print("🧹 Cleaning ghost processes...")
     try:
         current_pid = os.getpid()
-        # Doosre python processes ko dhoond kar kill karna
+        # Kill other python processes to avoid 409 Conflict error
         os.system(f"ps -ef | grep python | grep -v {current_pid} | awk '{{print $2}}' | xargs kill -9 2>/dev/null")
-    except:
-        pass
+    except Exception as e:
+        print(f"Cleanup Error: {e}")
 
 # --- HANDLERS ---
 
@@ -82,24 +82,23 @@ def handle_bgmi(message):
 if __name__ == "__main__":
     print("--- STARTING BOT ENGINE ---")
     
-    # Purane instances kill karna
+    # Instance cleaning
     kill_other_instances()
     
-    # Telegram session reset (Conflict rokne ke liye)
+    # Telegram session reset
     try:
-        requests.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=true")
+        requests.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=10)
         print("Telegram session reset done.")
-    except:
-        pass
+    except Exception as e:
+        print(f"Session Reset Error: {e}")
 
-    # Stabilization delay
+    # Stabilization delay for Railway
     print("⏳ Stabilizing (10s)...")
     time.sleep(10)
 
     print("🚀 Bot is now Polling!")
     while True:
         try:
-            # Polling start
             bot.polling(none_stop=True, skip_pending=True, interval=2, timeout=60)
         except Exception as e:
             err = str(e)
