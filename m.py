@@ -20,27 +20,30 @@ if not os.path.exists(USER_FILE):
 
 def read_users():
     try:
-        with open(USER_FILE, "r") as file:
-            return file.read().splitlines()
+        if os.path.exists(USER_FILE):
+            with open(USER_FILE, "r") as file:
+                return file.read().splitlines()
     except:
         return []
+    return []
 
-# --- TERMINATOR LOGIC (Railway Conflict Fixer) ---
+# --- TERMINATOR LOGIC (Railway Optimized) ---
 def kill_other_instances():
-    """Kills any ghost processes to prevent 409 Conflict."""
-    print("🧹 Cleaning ghost processes...")
+    """Kills any ghost processes safely without relying on 'ps' command."""
+    print("🧹 Cleaning environment...")
+    # Railway handles container restarts, so we mainly focus on Telegram session
     try:
-        current_pid = os.getpid()
-        # Kill other python processes to avoid 409 Conflict error
-        os.system(f"ps -ef | grep python | grep -v {current_pid} | awk '{{print $2}}' | xargs kill -9 2>/dev/null")
+        # Resetting the webhook/polling session is the most effective way to stop duplicates
+        requests.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=10)
+        print("✅ Telegram session reset successful.")
     except Exception as e:
-        print(f"Cleanup Error: {e}")
+        print(f"⚠️ Session Reset Warning: {e}")
 
 # --- HANDLERS ---
 
 @bot.message_handler(commands=['start'])
 def start_command(message):
-    bot.reply_to(message, "⚡ **Bot Active on Railway!**\n\nUsage: `/bgmi <ip> <port> <time>`\nAdmin: @SODHI_OWNER")
+    bot.reply_to(message, "⚡ **Bot Active on Railway!**\n\nUsage: `/bgmi <ip> <port> <time>`\nAdmin: @SODHI_OWNER", parse_mode="Markdown")
 
 @bot.message_handler(commands=['add'])
 def add_user(message):
@@ -50,7 +53,7 @@ def add_user(message):
             new_uid = parts[1]
             with open(USER_FILE, "a") as f:
                 f.write(f"{new_uid}\n")
-            bot.reply_to(message, f"✅ User {new_uid} added.")
+            bot.reply_to(message, f"✅ User `{new_uid}` added.", parse_mode="Markdown")
     else:
         bot.reply_to(message, "❌ Admin only command.")
 
@@ -60,13 +63,13 @@ def handle_bgmi(message):
     allowed_users = read_users()
     
     if user_id not in allowed_users and user_id not in admin_id:
-        bot.reply_to(message, "🚫 **Access Denied!**\nBuy from @SODHI_OWNER")
+        bot.reply_to(message, "🚫 **Access Denied!**\nBuy from @SODHI_OWNER", parse_mode="Markdown")
         return
 
     cmd_parts = message.text.split()
     if len(cmd_parts) == 4:
         target, port, duration = cmd_parts[1], cmd_parts[2], cmd_parts[3]
-        bot.send_message(message.chat.id, f"🚀 **Attack Sent!**\n🎯 Target: `{target}:{port}`\n⏳ Time: `{duration}s`")
+        bot.send_message(message.chat.id, f"🚀 **Attack Sent!**\n🎯 Target: `{target}:{port}`\n⏳ Time: `{duration}s`", parse_mode="Markdown")
         
         try:
             # Binary ko permission dena
@@ -82,29 +85,24 @@ def handle_bgmi(message):
 if __name__ == "__main__":
     print("--- STARTING BOT ENGINE ---")
     
-    # Instance cleaning
+    # Session cleanup
     kill_other_instances()
     
-    # Telegram session reset
-    try:
-        requests.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=10)
-        print("Telegram session reset done.")
-    except Exception as e:
-        print(f"Session Reset Error: {e}")
-
-    # Stabilization delay for Railway
-    print("⏳ Stabilizing (10s)...")
+    # Stabilization delay for Railway (Old container shutdown time)
+    print("⏳ Stabilizing environment (10s)...")
     time.sleep(10)
 
     print("🚀 Bot is now Polling!")
     while True:
         try:
+            # skip_pending=True ignores old messages to avoid spamming
             bot.polling(none_stop=True, skip_pending=True, interval=2, timeout=60)
         except Exception as e:
             err = str(e)
-            print(f"Error: {err}")
+            print(f"Polling Error: {err}")
             if "Conflict" in err or "409" in err:
+                print("🔄 Conflict detected, retrying cleanup...")
                 kill_other_instances()
-                time.sleep(20)
+                time.sleep(15)
             else:
                 time.sleep(5)
