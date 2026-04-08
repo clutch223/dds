@@ -5,6 +5,7 @@ import subprocess
 import datetime
 import os
 import time
+import signal
 
 # Railway setup: keep_alive handles the port binding for web services
 try:
@@ -92,25 +93,31 @@ def help_cmd(message):
 
 # --- Polling Logic with Conflict Fix ---
 if __name__ == "__main__":
-    print("Railway Conflict Fixer Active...")
+    print("Railway Force Instance Cleaner Active...")
     
-    # 1. Sabse pehle purana connection reset karo
+    # Force delete webhook before starting
     try:
         bot.remove_webhook()
-        time.sleep(2)
+        print("Webhook removed.")
     except:
         pass
 
+    # Wait for other potential Railway instances to be killed by the system
+    print("Waiting 10 seconds for clean environment...")
+    time.sleep(10)
+
     while True:
         try:
-            print("Starting Bot Polling...")
-            # timeout=60 aur interval=2 dene se Railway par connection stable rehta hai
-            bot.polling(none_stop=True, skip_pending=True, interval=2, timeout=60)
+            print("Attempting to start polling...")
+            # Use skip_pending to ignore old commands during the conflict period
+            bot.polling(none_stop=True, skip_pending=True, interval=1, timeout=40)
         except Exception as e:
-            # Agar 409 error aaye, toh bot 15 seconds wait karega taaki purana deployment kill ho jaye
-            print(f"Polling Error: {e}")
-            if "Conflict" in str(e) or "409" in str(e):
-                print("Multiple instances detected. Sleeping for 15s to clear session...")
-                time.sleep(15)
+            error_msg = str(e)
+            print(f"Polling Error: {error_msg}")
+            
+            if "Conflict" in error_msg or "409" in error_msg:
+                print("CRITICAL: Multiple instances detected. Waiting 30s for session to expire...")
+                # Long sleep to force Telegram to drop the other connection
+                time.sleep(30)
             else:
                 time.sleep(5)
